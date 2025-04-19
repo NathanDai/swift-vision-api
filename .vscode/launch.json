@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:apple-vision}",
+            "name": "Debug AppleVision",
+            "program": "${workspaceFolder:apple-vision}/.build/debug/AppleVision",
+            "preLaunchTask": "swift: Build Debug AppleVision"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:apple-vision}",
+            "name": "Release AppleVision",
+            "program": "${workspaceFolder:apple-vision}/.build/release/AppleVision",
+            "preLaunchTask": "swift: Build Release AppleVision"
+        }
+    ]
+}

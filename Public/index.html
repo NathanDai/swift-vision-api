@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR 图片识别</title>
+    <style>
+        :root {
+            --primary-color: #007AFF;
+            --hover-color: #0056b3;
+            --border-color: #ccc;
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f7;
+            color: var(--text-color);
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        h1 {
+            grid-column: 1 / -1;
+            margin: 0;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            background: var(--bg-color);
+        }
+
+        .upload-area:hover, .upload-area.drag-over {
+            border-color: var(--primary-color);
+            background: #f0f7ff;
+        }
+
+        .upload-area p {
+            margin: 0;
+            color: #666;
+        }
+
+        .preview-container {
+            position: relative;
+            display: inline-block;
+            line-height: 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        #preview {
+            max-width: 100%;
+            height: auto;
+            display: none;
+        }
+
+        .text-box {
+            position: absolute;
+            border: 2px solid rgba(255, 0, 0, 0.5);
+            pointer-events: auto;
+            box-sizing: border-box;
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .text-box:hover {
+            border-color: rgba(255, 0, 0, 0.8);
+            background: rgba(255, 0, 0, 0.1);
+        }
+
+        .text-box.highlighted {
+            border-color: rgba(255, 0, 0, 0.8);
+            background: rgba(255, 0, 0, 0.1);
+        }
+
+        .text-tooltip {
+            position: fixed;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s;
+            white-space: nowrap;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .results-list {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 100%;
+            border: 1px solid #eee;
+        }
+
+        .results-header {
+            padding: 16px;
+            background: var(--bg-color);
+            border-bottom: 1px solid #eee;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .results-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 300px;
+            color: #999;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .results-placeholder svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            color: #ccc;
+        }
+
+        .results-placeholder p {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .results-content {
+            max-height: 600px;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+
+        .result-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .result-item:hover, .result-item.highlighted {
+            background: var(--bg-color);
+        }
+
+        .result-text {
+            font-size: 14px;
+            margin-right: 12px;
+            flex: 1;
+            user-select: text;
+        }
+
+        .copy-button {
+            opacity: 0;
+            padding: 4px 8px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-right: 8px;
+        }
+
+        .copy-button:hover {
+            background: #e0e0e0;
+        }
+
+        .result-item:hover .copy-button {
+            opacity: 1;
+        }
+
+        .copy-button.copied {
+            background: #4caf50;
+            color: white;
+        }
+
+        .result-confidence {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+            min-width: 60px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .confidence-high {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+        }
+
+        .confidence-medium {
+            background: #fff3e0;
+            color: #ef6c00;
+            border: 1px solid #ffcc80;
+        }
+
+        .confidence-low {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--hover-color);
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            background: var(--border-color);
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .loading {
+            position: relative;
+            pointer-events: none;
+        }
+
+        .loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            margin: -10px 0 0 -10px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 自定义滚动条 */
+        .results-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .results-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .results-content::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 4px;
+        }
+
+        .results-content::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OCR 图片识别</h1>
+        
+        <div class="left-panel">
+            <div class="upload-area" id="uploadArea">
+                <p>点击或拖拽图片到这里</p>
+                <input type="file" id="fileInput" accept="image/*" style="display: none">
+            </div>
+
+            <div class="preview-container">
+                <img id="preview" alt="预览">
+            </div>
+
+            <button id="recognizeBtn" disabled>开始识别</button>
+        </div>
+
+        <div id="results-list" class="results-list">
+            <div class="results-header">识别结果</div>
+            <div id="results-content" class="results-content"></div>
+            <div id="results-placeholder" class="results-placeholder">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    <path d="M9 9h6M9 13h6M9 17h6"/>
+                </svg>
+                <p>上传图片后<br>这里将显示识别到的文字</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM 元素
+        const elements = {
+            uploadArea: document.getElementById('uploadArea'),
+            fileInput: document.getElementById('fileInput'),
+            preview: document.getElementById('preview'),
+            recognizeBtn: document.getElementById('recognizeBtn'),
+            resultsList: document.getElementById('results-list'),
+            resultsContent: document.getElementById('results-content'),
+            previewContainer: document.querySelector('.preview-container')
+        };
+
+        let tooltip = null;
+        let currentResults = [];
+
+        // 创建工具提示
+        function createTooltip() {
+            tooltip = document.createElement('div');
+            tooltip.className = 'text-tooltip';
+            elements.previewContainer.appendChild(tooltip);
+        }
+
+        // 显示工具提示
+        function showTooltip(text, confidence, x, y) {
+            if (!tooltip) createTooltip();
+            
+            tooltip.textContent = `${text} (${(confidence * 100).toFixed(1)}%)`;
+            tooltip.style.opacity = '1';
+
+            // 获取视口尺寸
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const tooltipRect = tooltip.getBoundingClientRect();
+            
+            // 计算位置，确保提示框在视口内
+            let posX = x;
+            let posY = y - tooltipRect.height - 10;
+
+            // 水平方向调整
+            if (posX + tooltipRect.width > viewportWidth) {
+                posX = viewportWidth - tooltipRect.width - 10;
+            }
+            if (posX < 0) {
+                posX = 10;
+            }
+
+            // 垂直方向调整
+            if (posY < 0) {
+                posY = y + 20; // 如果上方放不下，就放到下方
+            }
+            if (posY + tooltipRect.height > viewportHeight) {
+                posY = viewportHeight - tooltipRect.height - 10;
+            }
+
+            tooltip.style.left = `${posX}px`;
+            tooltip.style.top = `${posY}px`;
+        }
+
+        // 隐藏工具提示
+        function hideTooltip() {
+            if (tooltip) tooltip.style.opacity = '0';
+        }
+
+        // 文件处理
+        function handleFile(file) {
+            if (!file || !file.type.startsWith('image/')) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                elements.preview.src = e.target.result;
+                elements.preview.style.display = 'block';
+                elements.recognizeBtn.disabled = false;
+                clearResults();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 清除结果
+        function clearResults() {
+            document.querySelectorAll('.text-box').forEach(el => el.remove());
+            elements.resultsContent.innerHTML = '';
+            elements.resultsList.querySelector('.results-placeholder').style.display = 'flex';
+            currentResults = [];
+            if (tooltip) tooltip.remove();
+            tooltip = null;
+        }
+
+        // 绘制边界框
+        function drawBoundingBoxes(results) {
+            const { offsetWidth: width, offsetHeight: height } = elements.preview;
+            
+            results.forEach((result, index) => {
+                const { boundingBox: box, text, confidence } = result;
+                
+                const textBox = document.createElement('div');
+                textBox.className = 'text-box';
+                textBox.dataset.index = index;
+                
+                Object.assign(textBox.style, {
+                    left: `${box.x * width}px`,
+                    top: `${box.y * height}px`,
+                    width: `${box.width * width}px`,
+                    height: `${box.height * height}px`
+                });
+
+                // 鼠标事件处理
+                textBox.addEventListener('mouseenter', (e) => {
+                    const rect = textBox.getBoundingClientRect();
+                    showTooltip(text, confidence, rect.left, rect.top);
+                    textBox.classList.add('highlighted');
+                    highlightResultItem(index);
+                });
+
+                textBox.addEventListener('mouseleave', () => {
+                    hideTooltip();
+                    textBox.classList.remove('highlighted');
+                    unhighlightResultItem(index);
+                });
+
+                elements.previewContainer.appendChild(textBox);
+            });
+        }
+
+        // 高亮结果项
+        function highlightResultItem(index) {
+            const item = elements.resultsContent.children[index];
+            if (item) {
+                item.classList.add('highlighted');
+                item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        // 取消高亮结果项
+        function unhighlightResultItem(index) {
+            const item = elements.resultsContent.children[index];
+            if (item) item.classList.remove('highlighted');
+        }
+
+        // 显示识别结果
+        function displayResults(results) {
+            currentResults = results;
+            elements.resultsList.querySelector('.results-placeholder').style.display = 'none';
+            elements.resultsContent.innerHTML = results.map((result, index) => {
+                const confidence = result.confidence * 100;
+                const confidenceClass = confidence >= 80 ? 'confidence-high' 
+                                    : confidence >= 50 ? 'confidence-medium'
+                                    : 'confidence-low';
+                
+                return `
+                    <div class="result-item" data-index="${index}">
+                        <span class="result-text">${result.text}</span>
+                        <button class="copy-button" data-text="${result.text}">复制</button>
+                        <span class="result-confidence ${confidenceClass}">
+                            ${confidence.toFixed(1)}%
+                        </span>
+                    </div>
+                `;
+            }).join('');
+
+            // 添加复制功能
+            elements.resultsContent.querySelectorAll('.copy-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.stopPropagation(); // 阻止事件冒泡
+                    const text = button.dataset.text;
+                    navigator.clipboard.writeText(text).then(() => {
+                        button.textContent = '已复制';
+                        button.classList.add('copied');
+                        setTimeout(() => {
+                            button.textContent = '复制';
+                            button.classList.remove('copied');
+                        }, 1500);
+                    });
+                });
+            });
+
+            // 添加结果项的鼠标事件
+            elements.resultsContent.querySelectorAll('.result-item').forEach(item => {
+                item.addEventListener('mouseenter', () => {
+                    const index = parseInt(item.dataset.index);
+                    const textBox = document.querySelector(`.text-box[data-index="${index}"]`);
+                    if (textBox) {
+                        textBox.classList.add('highlighted');
+                        const rect = textBox.getBoundingClientRect();
+                        showTooltip(results[index].text, results[index].confidence, rect.left, rect.top);
+                    }
+                    item.classList.add('highlighted');
+                });
+
+                item.addEventListener('mouseleave', () => {
+                    const index = parseInt(item.dataset.index);
+                    const textBox = document.querySelector(`.text-box[data-index="${index}"]`);
+                    if (textBox) textBox.classList.remove('highlighted');
+                    hideTooltip();
+                    item.classList.remove('highlighted');
+                });
+
+                // 添加点击复制功能
+                item.addEventListener('click', () => {
+                    const text = results[parseInt(item.dataset.index)].text;
+                    navigator.clipboard.writeText(text).then(() => {
+                        const button = item.querySelector('.copy-button');
+                        button.textContent = '已复制';
+                        button.classList.add('copied');
+                        setTimeout(() => {
+                            button.textContent = '复制';
+                            button.classList.remove('copied');
+                        }, 1500);
+                    });
+                });
+            });
+
+            // 添加边界框的点击复制功能
+            document.querySelectorAll('.text-box').forEach((box, index) => {
+                box.addEventListener('click', () => {
+                    const text = results[index].text;
+                    navigator.clipboard.writeText(text).then(() => {
+                        const button = elements.resultsContent.querySelector(
+                            `.result-item[data-index="${index}"] .copy-button`
+                        );
+                        button.textContent = '已复制';
+                        button.classList.add('copied');
+                        setTimeout(() => {
+                            button.textContent = '复制';
+                            button.classList.remove('copied');
+                        }, 1500);
+                    });
+                });
+            });
+        }
+
+        // 事件监听
+        elements.uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            elements.uploadArea.classList.add('drag-over');
+        });
+
+        elements.uploadArea.addEventListener('dragleave', () => {
+            elements.uploadArea.classList.remove('drag-over');
+        });
+
+        elements.uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            elements.uploadArea.classList.remove('drag-over');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        elements.uploadArea.addEventListener('click', () => {
+            elements.fileInput.click();
+        });
+
+        elements.fileInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+
+        elements.recognizeBtn.addEventListener('click', async () => {
+            const file = elements.fileInput.files[0];
+            if (!file) return;
+
+            try {
+                elements.recognizeBtn.classList.add('loading');
+                elements.recognizeBtn.disabled = true;
+
+                const formData = new FormData();
+                formData.append('image', file);
+
+                const response = await fetch('/vision/ocr', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const results = await response.json();
+                
+                // 等待图片完全加载
+                if (!elements.preview.complete) {
+                    await new Promise(resolve => {
+                        elements.preview.onload = resolve;
+                    });
+                }
+                
+                clearResults();
+                drawBoundingBoxes(results);
+                displayResults(results);
+                
+            } catch (error) {
+                alert(`错误: ${error.message}`);
+            } finally {
+                elements.recognizeBtn.classList.remove('loading');
+                elements.recognizeBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html> 
