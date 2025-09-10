@@ -28,6 +28,7 @@ let package = Package(
                 .target(name: "AppleVision"),
                 .product(name: "VaporTesting", package: "vapor"),
             ],
+            path: "Tests/AppleVisionTests",
             swiftSettings: swiftSettings
         )
     ]
